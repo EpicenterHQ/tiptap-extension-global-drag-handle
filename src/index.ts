@@ -5,10 +5,9 @@ import {
   PluginKey,
   TextSelection,
 } from '@tiptap/pm/state';
-import { Fragment, Slice, Node } from '@tiptap/pm/model';
+import { Fragment, Slice, type Node } from '@tiptap/pm/model';
 
-// @ts-ignore
-import { __serializeForClipboard, EditorView } from '@tiptap/pm/view';
+import { __serializeForClipboard, type EditorView } from '@tiptap/pm/view';
 
 export interface GlobalDragHandleOptions {
   /**
