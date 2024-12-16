@@ -9,18 +9,11 @@ import { type EditorView, __serializeForClipboard } from '@tiptap/pm/view';
 import type { GlobalDragHandleOptions } from '.';
 import { absoluteRect, nodeDOMAtCoords, nodePosAtDOM } from './utils/dom';
 
-type DragHandleState = {
-  dragHandleElement: HTMLElement | null;
-  listType: string;
-};
-
 export function DragHandlePlugin(
   options: GlobalDragHandleOptions & { pluginKey: string },
 ) {
-  const state: DragHandleState = {
-    dragHandleElement: null,
-    listType: '',
-  };
+  let dragHandleElement: HTMLElement | null = null;
+  let listType = '';
 
   return new Plugin({
     key: new PluginKey(options.pluginKey),
@@ -28,22 +21,25 @@ export function DragHandlePlugin(
       const handleBySelector = options.dragHandleSelector
         ? document.querySelector<HTMLElement>(options.dragHandleSelector)
         : null;
-      state.dragHandleElement =
-        handleBySelector ?? document.createElement('div');
-      state.dragHandleElement.draggable = true;
-      state.dragHandleElement.dataset.dragHandle = '';
-      state.dragHandleElement.classList.add('drag-handle');
+      dragHandleElement = handleBySelector ?? document.createElement('div');
+      dragHandleElement.draggable = true;
+      dragHandleElement.dataset.dragHandle = '';
+      dragHandleElement.classList.add('drag-handle');
 
       const onDragHandleDragStart = (e: DragEvent) =>
-        handleDragStart(e, view, options, state);
+        handleDragStart({
+          event: e,
+          view,
+          options,
+          setListType: (type) => {
+            listType = type;
+          },
+        });
 
-      state.dragHandleElement.addEventListener(
-        'dragstart',
-        onDragHandleDragStart,
-      );
+      dragHandleElement.addEventListener('dragstart', onDragHandleDragStart);
 
       const onDragHandleDrag = (e: DragEvent) => {
-        hideDragHandle(state);
+        hideDragHandle(dragHandleElement);
         const scrollY = window.scrollY;
         if (e.clientY < options.scrollThreshold) {
           window.scrollTo({ top: scrollY - 30, behavior: 'smooth' });
@@ -52,16 +48,16 @@ export function DragHandlePlugin(
         }
       };
 
-      state.dragHandleElement.addEventListener('drag', onDragHandleDrag);
+      dragHandleElement.addEventListener('drag', onDragHandleDrag);
 
-      hideDragHandle(state);
+      hideDragHandle(dragHandleElement);
 
       if (!handleBySelector) {
-        view?.dom?.parentElement?.appendChild(state.dragHandleElement);
+        view?.dom?.parentElement?.appendChild(dragHandleElement);
       }
 
       const boundHideHandleOnEditorOut = (e: MouseEvent) =>
-        hideHandleOnEditorOut(e, state);
+        hideHandleOnEditorOut(e, dragHandleElement);
 
       view?.dom?.parentElement?.addEventListener(
         'mouseout',
@@ -71,17 +67,14 @@ export function DragHandlePlugin(
       return {
         destroy: () => {
           if (!handleBySelector) {
-            state.dragHandleElement?.remove?.();
+            dragHandleElement?.remove?.();
           }
-          state.dragHandleElement?.removeEventListener(
-            'drag',
-            onDragHandleDrag,
-          );
-          state.dragHandleElement?.removeEventListener(
+          dragHandleElement?.removeEventListener('drag', onDragHandleDrag);
+          dragHandleElement?.removeEventListener(
             'dragstart',
             onDragHandleDragStart,
           );
-          state.dragHandleElement = null;
+          dragHandleElement = null;
           view?.dom?.parentElement?.removeEventListener(
             'mouseout',
             boundHideHandleOnEditorOut,
@@ -92,9 +85,7 @@ export function DragHandlePlugin(
     props: {
       handleDOMEvents: {
         mousemove: (view, event) => {
-          if (!view.editable) {
-            return;
-          }
+          if (!view.editable || !dragHandleElement) return;
 
           const node = nodeDOMAtCoords(
             {
@@ -114,7 +105,7 @@ export function DragHandlePlugin(
             node.matches(excludedTagList) ||
             notDragging
           ) {
-            hideDragHandle(state);
+            hideDragHandle(dragHandleElement);
             return;
           }
 
@@ -135,17 +126,15 @@ export function DragHandlePlugin(
           }
           rect.width = options.dragHandleWidth;
 
-          if (!state.dragHandleElement) return;
-
-          state.dragHandleElement.style.left = `${rect.left - rect.width}px`;
-          state.dragHandleElement.style.top = `${rect.top}px`;
-          showDragHandle(state);
+          dragHandleElement.style.left = `${rect.left - rect.width}px`;
+          dragHandleElement.style.top = `${rect.top}px`;
+          showDragHandle(dragHandleElement);
         },
         keydown: () => {
-          hideDragHandle(state);
+          hideDragHandle(dragHandleElement);
         },
         mousewheel: () => {
-          hideDragHandle(state);
+          hideDragHandle(dragHandleElement);
         },
         // dragging class is used for CSS
         dragstart: (view) => {
@@ -153,7 +142,7 @@ export function DragHandlePlugin(
         },
         drop: (view, event) => {
           view.dom.classList.remove('dragging');
-          hideDragHandle(state);
+          hideDragHandle(dragHandleElement);
           let droppedNode: Node | null = null;
           const dropPos = view.posAtCoords({
             left: event.clientX,
@@ -177,7 +166,7 @@ export function DragHandlePlugin(
             view.state.selection instanceof NodeSelection &&
             view.state.selection.node.type.name === 'listItem' &&
             !isDroppedInsideList &&
-            state.listType == 'OL'
+            listType === 'OL'
           ) {
             const newList = view.state.schema.nodes.orderedList?.createAndFill(
               null,
@@ -195,12 +184,17 @@ export function DragHandlePlugin(
   });
 }
 
-function handleDragStart(
-  event: DragEvent,
-  view: EditorView,
-  options: GlobalDragHandleOptions,
-  state: DragHandleState,
-) {
+function handleDragStart({
+  event,
+  view,
+  options,
+  setListType,
+}: {
+  event: DragEvent;
+  view: EditorView;
+  options: GlobalDragHandleOptions;
+  setListType: (type: string) => void;
+}) {
   view.focus();
 
   if (!event.dataTransfer) return;
@@ -268,7 +262,7 @@ function handleDragStart(
     view.state.selection instanceof NodeSelection &&
     view.state.selection.node.type.name === 'listItem'
   ) {
-    state.listType = node.parentElement?.tagName || '';
+    setListType(node.parentElement?.tagName || '');
   }
 
   const slice = view.state.selection.content();
@@ -284,19 +278,15 @@ function handleDragStart(
   view.dragging = { slice, move: event.ctrlKey };
 }
 
-function hideDragHandle(state: DragHandleState) {
-  if (state.dragHandleElement) {
-    state.dragHandleElement.classList.add('hide');
-  }
+function hideDragHandle(element: HTMLElement | null) {
+  element?.classList.add('hide');
 }
 
-function showDragHandle(state: DragHandleState) {
-  if (state.dragHandleElement) {
-    state.dragHandleElement.classList.remove('hide');
-  }
+function showDragHandle(element: HTMLElement | null) {
+  element?.classList.remove('hide');
 }
 
-function hideHandleOnEditorOut(event: MouseEvent, state: DragHandleState) {
+function hideHandleOnEditorOut(event: MouseEvent, element: HTMLElement | null) {
   if (event.target instanceof Element) {
     const relatedTarget = event.relatedTarget as HTMLElement;
     const isInsideEditor =
@@ -305,7 +295,7 @@ function hideHandleOnEditorOut(event: MouseEvent, state: DragHandleState) {
 
     if (isInsideEditor) return;
   }
-  hideDragHandle(state);
+  hideDragHandle(element);
 }
 
 function calcNodePos(pos: number, view: EditorView) {
