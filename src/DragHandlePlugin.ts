@@ -24,7 +24,6 @@ const createDragHandle = (options: GlobalDragHandleOptions) => {
       element = options.dragHandleSelector
         ? document.querySelector<HTMLElement>(options.dragHandleSelector)
         : null;
-
       if (!element) {
         element = document.createElement('div');
         element.draggable = true;
@@ -33,6 +32,16 @@ const createDragHandle = (options: GlobalDragHandleOptions) => {
         view?.dom?.parentElement?.appendChild(element);
       }
       this.hideDragHandle();
+
+      const onDragHandleDrag = (e: DragEvent) => {
+        this.hideDragHandle();
+        const scrollY = window.scrollY;
+        if (e.clientY < options.scrollThreshold) {
+          window.scrollTo({ top: scrollY - 30, behavior: 'smooth' });
+        } else if (window.innerHeight - e.clientY < options.scrollThreshold) {
+          window.scrollTo({ top: scrollY + 30, behavior: 'smooth' });
+        }
+      };
 
       const onDragHandleDragStart = (event: DragEvent) => {
         view.focus();
@@ -119,20 +128,6 @@ const createDragHandle = (options: GlobalDragHandleOptions) => {
         view.dragging = { slice, move: event.ctrlKey };
       };
 
-      element?.addEventListener('dragstart', onDragHandleDragStart);
-
-      const onDragHandleDrag = (e: DragEvent) => {
-        this.hideDragHandle();
-        const scrollY = window.scrollY;
-        if (e.clientY < options.scrollThreshold) {
-          window.scrollTo({ top: scrollY - 30, behavior: 'smooth' });
-        } else if (window.innerHeight - e.clientY < options.scrollThreshold) {
-          window.scrollTo({ top: scrollY + 30, behavior: 'smooth' });
-        }
-      };
-
-      element?.addEventListener('drag', onDragHandleDrag);
-
       const boundHideHandleOnEditorOut = (event: MouseEvent) => {
         if (event.target instanceof Element) {
           const relatedTarget = event.relatedTarget as HTMLElement;
@@ -144,6 +139,8 @@ const createDragHandle = (options: GlobalDragHandleOptions) => {
         this.hideDragHandle();
       };
 
+      element?.addEventListener('drag', onDragHandleDrag);
+      element?.addEventListener('dragstart', onDragHandleDragStart);
       view?.dom?.parentElement?.addEventListener(
         'mouseout',
         boundHideHandleOnEditorOut,
@@ -151,13 +148,13 @@ const createDragHandle = (options: GlobalDragHandleOptions) => {
 
       return {
         destroy: () => {
-          element?.remove?.();
           element?.removeEventListener('drag', onDragHandleDrag);
           element?.removeEventListener('dragstart', onDragHandleDragStart);
           view?.dom?.parentElement?.removeEventListener(
             'mouseout',
             boundHideHandleOnEditorOut,
           );
+          element?.remove?.();
           element = null;
         },
       };
