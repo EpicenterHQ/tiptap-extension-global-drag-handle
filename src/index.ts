@@ -16,9 +16,9 @@ export interface GlobalDragHandleOptions {
   dragHandleWidth: number;
 
   /**
-   * The treshold for scrolling
+   * The threshold for scrolling
    */
-  scrollTreshold: number;
+  scrollThreshold: number;
 
   /*
    * The css selector to query for the drag handle. (eg: '.custom-handle').
@@ -240,9 +240,9 @@ export function DragHandlePlugin(
       function onDragHandleDrag(e: DragEvent) {
         hideDragHandle();
         let scrollY = window.scrollY;
-        if (e.clientY < options.scrollTreshold) {
+        if (e.clientY < options.scrollThreshold) {
           window.scrollTo({ top: scrollY - 30, behavior: 'smooth' });
-        } else if (window.innerHeight - e.clientY < options.scrollTreshold) {
+        } else if (window.innerHeight - e.clientY < options.scrollThreshold) {
           window.scrollTo({ top: scrollY + 30, behavior: 'smooth' });
         }
       }
@@ -389,7 +389,7 @@ const GlobalDragHandle = Extension.create({
   addOptions() {
     return {
       dragHandleWidth: 20,
-      scrollTreshold: 100,
+      scrollThreshold: 100,
       excludedTags: [],
       customNodes: [],
     };
@@ -400,7 +400,7 @@ const GlobalDragHandle = Extension.create({
       DragHandlePlugin({
         pluginKey: 'globalDragHandle',
         dragHandleWidth: this.options.dragHandleWidth,
-        scrollTreshold: this.options.scrollTreshold,
+        scrollThreshold: this.options.scrollThreshold,
         dragHandleSelector: this.options.dragHandleSelector,
         excludedTags: this.options.excludedTags,
         customNodes: this.options.customNodes,
