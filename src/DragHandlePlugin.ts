@@ -34,15 +34,90 @@ const createDragHandle = (options: GlobalDragHandleOptions) => {
       }
       this.hideDragHandle();
 
-      const onDragHandleDragStart = (e: DragEvent) =>
-        handleDragStart({
-          event: e,
-          view,
-          options,
-          setListType: (type) => {
-            listType = type;
+      const onDragHandleDragStart = (event: DragEvent) => {
+        view.focus();
+
+        if (!event.dataTransfer) return;
+
+        const node = nodeDOMAtCoords(
+          {
+            x: event.clientX + 50 + options.dragHandleWidth,
+            y: event.clientY,
           },
-        });
+          options,
+        );
+
+        if (!(node instanceof Element)) return;
+
+        let draggedNodePos = nodePosAtDOM(node, view, options);
+        if (draggedNodePos == null || draggedNodePos < 0) return;
+        draggedNodePos = calcNodePos(draggedNodePos, view);
+
+        const { from, to } = view.state.selection;
+        const diff = from - to;
+
+        const fromSelectionPos = calcNodePos(from, view);
+        let differentNodeSelected = false;
+
+        const nodePos = view.state.doc.resolve(fromSelectionPos);
+
+        if (nodePos.node().type.name === NODE_TYPES.DOC)
+          differentNodeSelected = true;
+        else {
+          const nodeSelection = NodeSelection.create(
+            view.state.doc,
+            nodePos.before(),
+          );
+
+          differentNodeSelected = !(
+            draggedNodePos + 1 >= nodeSelection.$from.pos &&
+            draggedNodePos <= nodeSelection.$to.pos
+          );
+        }
+        let selection = view.state.selection;
+        if (
+          !differentNodeSelected &&
+          diff !== 0 &&
+          !(view.state.selection instanceof NodeSelection)
+        ) {
+          const endSelection = NodeSelection.create(view.state.doc, to - 1);
+          selection = TextSelection.create(
+            view.state.doc,
+            draggedNodePos,
+            endSelection.$to.pos,
+          );
+        } else {
+          selection = NodeSelection.create(view.state.doc, draggedNodePos);
+
+          if (
+            (selection as NodeSelection).node.type.isInline ||
+            (selection as NodeSelection).node.type.name === NODE_TYPES.TABLE_ROW
+          ) {
+            const $pos = view.state.doc.resolve(selection.from);
+            selection = NodeSelection.create(view.state.doc, $pos.before());
+          }
+        }
+        view.dispatch(view.state.tr.setSelection(selection));
+
+        if (
+          view.state.selection instanceof NodeSelection &&
+          view.state.selection.node.type.name === NODE_TYPES.LIST_ITEM
+        ) {
+          listType = node.parentElement?.tagName || '';
+        }
+
+        const slice = view.state.selection.content();
+        const { dom, text } = __serializeForClipboard(view, slice);
+
+        event.dataTransfer.clearData();
+        event.dataTransfer.setData(MIME_TYPES.TEXT_HTML, dom.innerHTML);
+        event.dataTransfer.setData(MIME_TYPES.TEXT_PLAIN, text);
+        event.dataTransfer.effectAllowed = 'copyMove';
+
+        event.dataTransfer.setDragImage(node, 0, 0);
+
+        view.dragging = { slice, move: event.ctrlKey };
+      };
 
       element?.addEventListener('dragstart', onDragHandleDragStart);
 
@@ -114,7 +189,10 @@ export function DragHandlePlugin(
 
           const node = nodeDOMAtCoords(
             {
-              x: event.clientX + options.dragHandleOffset + options.dragHandleWidth,
+              x:
+                event.clientX +
+                options.dragHandleOffset +
+                options.dragHandleWidth,
               y: event.clientY,
             },
             options,
@@ -207,100 +285,6 @@ export function DragHandlePlugin(
       },
     },
   });
-}
-
-function handleDragStart({
-  event,
-  view,
-  options,
-  setListType,
-}: {
-  event: DragEvent;
-  view: EditorView;
-  options: GlobalDragHandleOptions;
-  setListType: (type: string) => void;
-}) {
-  view.focus();
-
-  if (!event.dataTransfer) return;
-
-  const node = nodeDOMAtCoords(
-    {
-      x: event.clientX + 50 + options.dragHandleWidth,
-      y: event.clientY,
-    },
-    options,
-  );
-
-  if (!(node instanceof Element)) return;
-
-  let draggedNodePos = nodePosAtDOM(node, view, options);
-  if (draggedNodePos == null || draggedNodePos < 0) return;
-  draggedNodePos = calcNodePos(draggedNodePos, view);
-
-  const { from, to } = view.state.selection;
-  const diff = from - to;
-
-  const fromSelectionPos = calcNodePos(from, view);
-  let differentNodeSelected = false;
-
-  const nodePos = view.state.doc.resolve(fromSelectionPos);
-
-  if (nodePos.node().type.name === NODE_TYPES.DOC) differentNodeSelected = true;
-  else {
-    const nodeSelection = NodeSelection.create(
-      view.state.doc,
-      nodePos.before(),
-    );
-
-    differentNodeSelected = !(
-      draggedNodePos + 1 >= nodeSelection.$from.pos &&
-      draggedNodePos <= nodeSelection.$to.pos
-    );
-  }
-  let selection = view.state.selection;
-  if (
-    !differentNodeSelected &&
-    diff !== 0 &&
-    !(view.state.selection instanceof NodeSelection)
-  ) {
-    const endSelection = NodeSelection.create(view.state.doc, to - 1);
-    selection = TextSelection.create(
-      view.state.doc,
-      draggedNodePos,
-      endSelection.$to.pos,
-    );
-  } else {
-    selection = NodeSelection.create(view.state.doc, draggedNodePos);
-
-    if (
-      (selection as NodeSelection).node.type.isInline ||
-      (selection as NodeSelection).node.type.name === NODE_TYPES.TABLE_ROW
-    ) {
-      const $pos = view.state.doc.resolve(selection.from);
-      selection = NodeSelection.create(view.state.doc, $pos.before());
-    }
-  }
-  view.dispatch(view.state.tr.setSelection(selection));
-
-  if (
-    view.state.selection instanceof NodeSelection &&
-    view.state.selection.node.type.name === NODE_TYPES.LIST_ITEM
-  ) {
-    setListType(node.parentElement?.tagName || '');
-  }
-
-  const slice = view.state.selection.content();
-  const { dom, text } = __serializeForClipboard(view, slice);
-
-  event.dataTransfer.clearData();
-  event.dataTransfer.setData(MIME_TYPES.TEXT_HTML, dom.innerHTML);
-  event.dataTransfer.setData(MIME_TYPES.TEXT_PLAIN, text);
-  event.dataTransfer.effectAllowed = 'copyMove';
-
-  event.dataTransfer.setDragImage(node, 0, 0);
-
-  view.dragging = { slice, move: event.ctrlKey };
 }
 
 function calcNodePos(pos: number, view: EditorView) {
