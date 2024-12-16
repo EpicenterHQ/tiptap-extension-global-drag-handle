@@ -35,7 +35,6 @@ export interface GlobalDragHandleOptions {
   customNodes: string[];
 }
 
-
 const GlobalDragHandle = Extension.create<GlobalDragHandleOptions>({
   name: PLUGIN_NAME,
 
@@ -50,15 +49,23 @@ const GlobalDragHandle = Extension.create<GlobalDragHandleOptions>({
   },
 
   addProseMirrorPlugins() {
+    const {
+      dragHandleWidth,
+      dragHandleOffset,
+      scrollThreshold,
+      dragHandleSelector,
+      excludedTags,
+      customNodes,
+    } = this.options;
     return [
       DragHandlePlugin({
         pluginKey: PLUGIN_NAME,
-        dragHandleWidth: this.options.dragHandleWidth,
-        dragHandleOffset: this.options.dragHandleOffset,
-        scrollThreshold: this.options.scrollThreshold,
-        dragHandleSelector: this.options.dragHandleSelector,
-        excludedTags: this.options.excludedTags,
-        customNodes: this.options.customNodes,
+        dragHandleWidth,
+        dragHandleOffset,
+        scrollThreshold,
+        dragHandleSelector,
+        excludedTags,
+        customNodes,
       }),
     ];
   },
