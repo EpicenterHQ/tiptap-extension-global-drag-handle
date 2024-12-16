@@ -42,6 +42,7 @@ const GlobalDragHandle = Extension.create({
   addOptions() {
     return {
       dragHandleWidth: DEFAULT_OPTIONS.DRAG_HANDLE_WIDTH,
+      dragHandleOffset: DEFAULT_OPTIONS.DRAG_HANDLE_OFFSET,
       scrollThreshold: DEFAULT_OPTIONS.SCROLL_THRESHOLD,
       excludedTags: [],
       customNodes: [],
@@ -53,6 +54,7 @@ const GlobalDragHandle = Extension.create({
       DragHandlePlugin({
         pluginKey: PLUGIN_NAME,
         dragHandleWidth: this.options.dragHandleWidth,
+        dragHandleOffset: this.options.dragHandleOffset,
         scrollThreshold: this.options.scrollThreshold,
         dragHandleSelector: this.options.dragHandleSelector,
         excludedTags: this.options.excludedTags,
