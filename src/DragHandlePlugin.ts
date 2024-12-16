@@ -126,7 +126,7 @@ export function DragHandlePlugin(
   });
 }
 
-const createDragHandle = (options: GlobalDragHandleOptions) => {
+function createDragHandle(options: GlobalDragHandleOptions) {
   let element: HTMLElement | null = null;
   let listType = '';
   return {
