@@ -36,7 +36,7 @@ export interface GlobalDragHandleOptions {
 }
 
 
-const GlobalDragHandle = Extension.create({
+const GlobalDragHandle = Extension.create<GlobalDragHandleOptions>({
   name: PLUGIN_NAME,
 
   addOptions() {
