@@ -9,6 +9,11 @@ export interface GlobalDragHandleOptions {
   dragHandleWidth: number;
 
   /**
+   * The offset of the drag handle
+   */
+  dragHandleOffset: number;
+
+  /**
    * The threshold for scrolling
    */
   scrollThreshold: number;
