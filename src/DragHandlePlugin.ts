@@ -8,6 +8,7 @@ import {
 import { type EditorView, __serializeForClipboard } from '@tiptap/pm/view';
 import type { GlobalDragHandleOptions } from '.';
 import { absoluteRect, nodeDOMAtCoords, nodePosAtDOM } from './utils/dom';
+import { DOM, NODE_TYPES, DEFAULT_OPTIONS, MIME_TYPES } from './constants';
 
 export function DragHandlePlugin(
   options: GlobalDragHandleOptions & { pluginKey: string },
@@ -24,7 +25,7 @@ export function DragHandlePlugin(
       dragHandleElement = handleBySelector ?? document.createElement('div');
       dragHandleElement.draggable = true;
       dragHandleElement.dataset.dragHandle = '';
-      dragHandleElement.classList.add('drag-handle');
+      dragHandleElement.classList.add(DOM.CLASSES.DRAG_HANDLE);
 
       const onDragHandleDragStart = (e: DragEvent) =>
         handleDragStart({
@@ -95,9 +96,9 @@ export function DragHandlePlugin(
             options,
           );
 
-          const notDragging = node?.closest('.not-draggable');
+          const notDragging = node?.closest(`.${DOM.CLASSES.NOT_DRAGGABLE}`);
           const excludedTagList = options.excludedTags
-            .concat(['ol', 'ul'])
+            .concat([DOM.TAGS.ORDERED_LIST, DOM.TAGS.UNORDERED_LIST])
             .join(', ');
 
           if (
@@ -121,7 +122,8 @@ export function DragHandlePlugin(
           rect.top += (lineHeight - 24) / 2;
           rect.top += paddingTop;
           // Li markers
-          if (node.matches('ul:not([data-type=taskList]) li, ol li')) {
+          const listItemsSelector = 'ul:not([data-type=taskList]) li, ol li'
+          if (node.matches(listItemsSelector)) {
             rect.left -= options.dragHandleWidth;
           }
           rect.width = options.dragHandleWidth;
@@ -138,10 +140,10 @@ export function DragHandlePlugin(
         },
         // dragging class is used for CSS
         dragstart: (view) => {
-          view.dom.classList.add('dragging');
+          view.dom.classList.add(DOM.CLASSES.DRAGGING);
         },
         drop: (view, event) => {
-          view.dom.classList.remove('dragging');
+          view.dom.classList.remove(DOM.CLASSES.DRAGGING);
           hideDragHandle(dragHandleElement);
           let droppedNode: Node | null = null;
           const dropPos = view.posAtCoords({
@@ -159,16 +161,16 @@ export function DragHandlePlugin(
           const resolvedPos = view.state.doc.resolve(dropPos.pos);
 
           const isDroppedInsideList =
-            resolvedPos.parent.type.name === 'listItem';
+            resolvedPos.parent.type.name === NODE_TYPES.LIST_ITEM;
 
           // If the selected node is a list item and is not dropped inside a list, we need to wrap it inside <ol> tag otherwise ol list items will be transformed into ul list item when dropped
           if (
             view.state.selection instanceof NodeSelection &&
-            view.state.selection.node.type.name === 'listItem' &&
+            view.state.selection.node.type.name === NODE_TYPES.LIST_ITEM &&
             !isDroppedInsideList &&
-            listType === 'OL'
+            listType === DOM.TAGS.ORDERED_LIST
           ) {
-            const newList = view.state.schema.nodes.orderedList?.createAndFill(
+            const newList = view.state.schema.nodes[NODE_TYPES.ORDERED_LIST]?.createAndFill(
               null,
               droppedNode,
             );
@@ -177,7 +179,7 @@ export function DragHandlePlugin(
           }
         },
         dragend: (view) => {
-          view.dom.classList.remove('dragging');
+          view.dom.classList.remove(DOM.CLASSES.DRAGGING);
         },
       },
     },
@@ -221,7 +223,7 @@ function handleDragStart({
 
   const nodePos = view.state.doc.resolve(fromSelectionPos);
 
-  if (nodePos.node().type.name === 'doc') differentNodeSelected = true;
+  if (nodePos.node().type.name === NODE_TYPES.DOC) differentNodeSelected = true;
   else {
     const nodeSelection = NodeSelection.create(
       view.state.doc,
@@ -250,7 +252,7 @@ function handleDragStart({
 
     if (
       (selection as NodeSelection).node.type.isInline ||
-      (selection as NodeSelection).node.type.name === 'tableRow'
+      (selection as NodeSelection).node.type.name === NODE_TYPES.TABLE_ROW
     ) {
       const $pos = view.state.doc.resolve(selection.from);
       selection = NodeSelection.create(view.state.doc, $pos.before());
@@ -260,7 +262,7 @@ function handleDragStart({
 
   if (
     view.state.selection instanceof NodeSelection &&
-    view.state.selection.node.type.name === 'listItem'
+    view.state.selection.node.type.name === NODE_TYPES.LIST_ITEM
   ) {
     setListType(node.parentElement?.tagName || '');
   }
@@ -269,8 +271,8 @@ function handleDragStart({
   const { dom, text } = __serializeForClipboard(view, slice);
 
   event.dataTransfer.clearData();
-  event.dataTransfer.setData('text/html', dom.innerHTML);
-  event.dataTransfer.setData('text/plain', text);
+  event.dataTransfer.setData(MIME_TYPES.TEXT_HTML, dom.innerHTML);
+  event.dataTransfer.setData(MIME_TYPES.TEXT_PLAIN, text);
   event.dataTransfer.effectAllowed = 'copyMove';
 
   event.dataTransfer.setDragImage(node, 0, 0);
@@ -279,19 +281,19 @@ function handleDragStart({
 }
 
 function hideDragHandle(element: HTMLElement | null) {
-  element?.classList.add('hide');
+  element?.classList.add(DOM.CLASSES.HIDE);
 }
 
 function showDragHandle(element: HTMLElement | null) {
-  element?.classList.remove('hide');
+  element?.classList.remove(DOM.CLASSES.HIDE);
 }
 
 function hideHandleOnEditorOut(event: MouseEvent, element: HTMLElement | null) {
   if (event.target instanceof Element) {
     const relatedTarget = event.relatedTarget as HTMLElement;
     const isInsideEditor =
-      relatedTarget?.classList.contains('tiptap') ||
-      relatedTarget?.classList.contains('drag-handle');
+      relatedTarget?.classList.contains(DOM.CLASSES.TIPTAP) ||
+      relatedTarget?.classList.contains(DOM.CLASSES.DRAG_HANDLE);
 
     if (isInsideEditor) return;
   }

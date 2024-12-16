@@ -1,5 +1,6 @@
 import { Extension } from '@tiptap/core';
 import { DragHandlePlugin } from './DragHandlePlugin';
+import { DEFAULT_OPTIONS, PLUGIN_NAME } from './constants';
 
 export interface GlobalDragHandleOptions {
   /**
@@ -31,12 +32,12 @@ export interface GlobalDragHandleOptions {
 
 
 const GlobalDragHandle = Extension.create({
-  name: 'globalDragHandle',
+  name: PLUGIN_NAME,
 
   addOptions() {
     return {
-      dragHandleWidth: 20,
-      scrollThreshold: 100,
+      dragHandleWidth: DEFAULT_OPTIONS.DRAG_HANDLE_WIDTH,
+      scrollThreshold: DEFAULT_OPTIONS.SCROLL_THRESHOLD,
       excludedTags: [],
       customNodes: [],
     };
@@ -45,7 +46,7 @@ const GlobalDragHandle = Extension.create({
   addProseMirrorPlugins() {
     return [
       DragHandlePlugin({
-        pluginKey: 'globalDragHandle',
+        pluginKey: PLUGIN_NAME,
         dragHandleWidth: this.options.dragHandleWidth,
         scrollThreshold: this.options.scrollThreshold,
         dragHandleSelector: this.options.dragHandleSelector,
