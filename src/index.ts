@@ -18,12 +18,21 @@ export interface GlobalDragHandleOptions {
    */
   scrollThreshold: number;
 
+  /**
+   * The speed of the scroll
+   */
+  scrollSpeed: number;
+
+  /**
+   * The multiplier for the line height
+   */
+  lineHeightMultiplier: number;
+
   /*
    * The css selector to query for the drag handle. (eg: '.custom-handle').
    * If handle element is found, that element will be used as drag handle. If not, a default handle will be created
    */
   dragHandleSelector?: string;
-
   /**
    * Tags to be excluded for drag handle
    */
@@ -39,33 +48,14 @@ const GlobalDragHandle = Extension.create<GlobalDragHandleOptions>({
   name: PLUGIN_NAME,
 
   addOptions() {
-    return {
-      dragHandleWidth: DEFAULT_OPTIONS.DRAG_HANDLE_WIDTH,
-      dragHandleOffset: DEFAULT_OPTIONS.DRAG_HANDLE_OFFSET,
-      scrollThreshold: DEFAULT_OPTIONS.SCROLL_THRESHOLD,
-      excludedTags: [],
-      customNodes: [],
-    };
+    return DEFAULT_OPTIONS;
   },
 
   addProseMirrorPlugins() {
-    const {
-      dragHandleWidth,
-      dragHandleOffset,
-      scrollThreshold,
-      dragHandleSelector,
-      excludedTags,
-      customNodes,
-    } = this.options;
     return [
       DragHandlePlugin({
         pluginKey: PLUGIN_NAME,
-        dragHandleWidth,
-        dragHandleOffset,
-        scrollThreshold,
-        dragHandleSelector,
-        excludedTags,
-        customNodes,
+        ...this.options,
       }),
     ];
   },

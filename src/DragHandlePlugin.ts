@@ -54,7 +54,7 @@ export function DragHandlePlugin(
           const compStyle = window.getComputedStyle(node);
           const parsedLineHeight = parseInt(compStyle.lineHeight, 10);
           const lineHeight = isNaN(parsedLineHeight)
-            ? parseInt(compStyle.fontSize) * 1.2
+            ? parseInt(compStyle.fontSize) * options.lineHeightMultiplier
             : parsedLineHeight;
           const paddingTop = parseInt(compStyle.paddingTop, 10);
 
@@ -151,7 +151,7 @@ function createDragHandle(options: GlobalDragHandleOptions) {
 
       const onDragHandleDrag = ({ clientY }: DragEvent) => {
         this.hideDragHandle();
-        handleAutoScroll({ clientY, scrollThreshold: options.scrollThreshold });
+        handleAutoScroll({ clientY, options });
       };
 
       const onDragHandleDragStart = (event: DragEvent) => {
@@ -284,24 +284,18 @@ function createDragHandle(options: GlobalDragHandleOptions) {
 
 function handleAutoScroll({
   clientY,
-  scrollThreshold,
+  options: { scrollThreshold, scrollSpeed },
 }: {
   clientY: number;
-  scrollThreshold: GlobalDragHandleOptions['scrollThreshold'];
+  options: GlobalDragHandleOptions;
 }) {
   const isNearTop = clientY < scrollThreshold;
   const isNearBottom = window.innerHeight - clientY < scrollThreshold;
 
   if (isNearTop) {
-    window.scrollTo({
-      top: window.scrollY - 30,
-      behavior: 'smooth',
-    });
+    window.scrollTo({ top: window.scrollY - scrollSpeed, behavior: 'smooth' });
   } else if (isNearBottom) {
-    window.scrollTo({
-      top: window.scrollY + 30,
-      behavior: 'smooth',
-    });
+    window.scrollTo({ top: window.scrollY + scrollSpeed, behavior: 'smooth' });
   }
 }
 

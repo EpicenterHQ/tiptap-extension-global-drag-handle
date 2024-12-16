@@ -1,4 +1,16 @@
+import type { GlobalDragHandleOptions } from '.';
+
 export const PLUGIN_NAME = 'globalDragHandle' as const;
+
+export const DEFAULT_OPTIONS = {
+  dragHandleWidth: 20,
+  dragHandleOffset: 50,
+  scrollThreshold: 100,
+  scrollSpeed: 30,
+  lineHeightMultiplier: 1.2,
+  excludedTags: [],
+  customNodes: [],
+} as const satisfies GlobalDragHandleOptions;
 
 export const DOM = {
   CLASSES: {
@@ -22,15 +34,7 @@ export const NODE_TYPES = {
   TABLE_ROW: 'tableRow',
 } as const;
 
-export const DEFAULT_OPTIONS = {
-  DRAG_HANDLE_WIDTH: 20,
-  SCROLL_THRESHOLD: 100,
-  SCROLL_SPEED: 30,
-  LINE_HEIGHT_MULTIPLIER: 1.2,
-  DRAG_HANDLE_OFFSET: 50,
-} as const;
-
 export const MIME_TYPES = {
   TEXT_HTML: 'text/html',
   TEXT_PLAIN: 'text/plain',
-} as const; 
+} as const;
