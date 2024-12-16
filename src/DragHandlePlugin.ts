@@ -149,14 +149,9 @@ function createDragHandle(options: GlobalDragHandleOptions) {
       }
       this.hideDragHandle();
 
-      const onDragHandleDrag = (e: DragEvent) => {
+      const onDragHandleDrag = ({ clientY }: DragEvent) => {
         this.hideDragHandle();
-        const scrollY = window.scrollY;
-        if (e.clientY < options.scrollThreshold) {
-          window.scrollTo({ top: scrollY - 30, behavior: 'smooth' });
-        } else if (window.innerHeight - e.clientY < options.scrollThreshold) {
-          window.scrollTo({ top: scrollY + 30, behavior: 'smooth' });
-        }
+        handleAutoScroll({ clientY, scrollThreshold: options.scrollThreshold });
       };
 
       const onDragHandleDragStart = (event: DragEvent) => {
@@ -282,7 +277,30 @@ function createDragHandle(options: GlobalDragHandleOptions) {
       element?.classList.remove(DOM.CLASSES.HIDE);
     },
   };
-};
+}
+
+function handleAutoScroll({
+  clientY,
+  scrollThreshold,
+}: {
+  clientY: number;
+  scrollThreshold: GlobalDragHandleOptions['scrollThreshold'];
+}) {
+  const isNearTop = clientY < scrollThreshold;
+  const isNearBottom = window.innerHeight - clientY < scrollThreshold;
+
+  if (isNearTop) {
+    window.scrollTo({
+      top: window.scrollY - 30,
+      behavior: 'smooth',
+    });
+  } else if (isNearBottom) {
+    window.scrollTo({
+      top: window.scrollY + 30,
+      behavior: 'smooth',
+    });
+  }
+}
 
 function calcNodePos(pos: number, view: EditorView) {
   const $pos = view.state.doc.resolve(pos);
