@@ -10,6 +10,122 @@ import type { GlobalDragHandleOptions } from '.';
 import { absoluteRect, nodeDOMAtCoords, nodePosAtDOM } from './utils/dom';
 import { DOM, NODE_TYPES, DEFAULT_OPTIONS, MIME_TYPES } from './constants';
 
+export function DragHandlePlugin(
+  options: GlobalDragHandleOptions & { pluginKey: string },
+) {
+  const dragHandle = createDragHandle(options);
+
+  return new Plugin({
+    key: new PluginKey(options.pluginKey),
+    view: (view) => {
+      const { destroy } = dragHandle.init(view);
+      return { destroy };
+    },
+    props: {
+      handleDOMEvents: {
+        mousemove: (view, event) => {
+          if (!view.editable || !dragHandle.element) return;
+
+          const node = nodeDOMAtCoords(
+            {
+              x:
+                event.clientX +
+                options.dragHandleOffset +
+                options.dragHandleWidth,
+              y: event.clientY,
+            },
+            options,
+          );
+
+          const notDragging = node?.closest(`.${DOM.CLASSES.NOT_DRAGGABLE}`);
+          const excludedTagList = options.excludedTags
+            .concat([DOM.TAGS.ORDERED_LIST, DOM.TAGS.UNORDERED_LIST])
+            .join(', ');
+
+          if (
+            !(node instanceof Element) ||
+            node.matches(excludedTagList) ||
+            notDragging
+          ) {
+            dragHandle.hideDragHandle();
+            return;
+          }
+
+          const compStyle = window.getComputedStyle(node);
+          const parsedLineHeight = parseInt(compStyle.lineHeight, 10);
+          const lineHeight = isNaN(parsedLineHeight)
+            ? parseInt(compStyle.fontSize) * 1.2
+            : parsedLineHeight;
+          const paddingTop = parseInt(compStyle.paddingTop, 10);
+
+          const rect = absoluteRect(node);
+
+          rect.top += (lineHeight - 24) / 2;
+          rect.top += paddingTop;
+          // Li markers
+          const listItemsSelector = 'ul:not([data-type=taskList]) li, ol li';
+          if (node.matches(listItemsSelector)) {
+            rect.left -= options.dragHandleWidth;
+          }
+          rect.width = options.dragHandleWidth;
+
+          dragHandle.element.style.left = `${rect.left - rect.width}px`;
+          dragHandle.element.style.top = `${rect.top}px`;
+          dragHandle.showDragHandle();
+        },
+        keydown: () => {
+          dragHandle.hideDragHandle();
+        },
+        mousewheel: () => {
+          dragHandle.hideDragHandle();
+        },
+        // dragging class is used for CSS
+        dragstart: (view) => {
+          view.dom.classList.add(DOM.CLASSES.DRAGGING);
+        },
+        drop: (view, event) => {
+          view.dom.classList.remove(DOM.CLASSES.DRAGGING);
+          dragHandle.hideDragHandle();
+          let droppedNode: Node | null = null;
+          const dropPos = view.posAtCoords({
+            left: event.clientX,
+            top: event.clientY,
+          });
+
+          if (!dropPos) return;
+
+          if (view.state.selection instanceof NodeSelection) {
+            droppedNode = view.state.selection.node;
+          }
+          if (!droppedNode) return;
+
+          const resolvedPos = view.state.doc.resolve(dropPos.pos);
+
+          const isDroppedInsideList =
+            resolvedPos.parent.type.name === NODE_TYPES.LIST_ITEM;
+
+          // If the selected node is a list item and is not dropped inside a list, we need to wrap it inside <ol> tag otherwise ol list items will be transformed into ul list item when dropped
+          if (
+            view.state.selection instanceof NodeSelection &&
+            view.state.selection.node.type.name === NODE_TYPES.LIST_ITEM &&
+            !isDroppedInsideList &&
+            dragHandle.listType === DOM.TAGS.ORDERED_LIST
+          ) {
+            const newList = view.state.schema.nodes[
+              NODE_TYPES.ORDERED_LIST
+            ]?.createAndFill(null, droppedNode);
+            const slice = new Slice(Fragment.from(newList), 0, 0);
+            view.dragging = { slice, move: event.ctrlKey };
+          }
+        },
+        dragend: (view) => {
+          view.dom.classList.remove(DOM.CLASSES.DRAGGING);
+        },
+      },
+    },
+  });
+}
+
 const createDragHandle = (options: GlobalDragHandleOptions) => {
   let element: HTMLElement | null = null;
   let listType = '';
@@ -167,122 +283,6 @@ const createDragHandle = (options: GlobalDragHandleOptions) => {
     },
   };
 };
-
-export function DragHandlePlugin(
-  options: GlobalDragHandleOptions & { pluginKey: string },
-) {
-  const dragHandle = createDragHandle(options);
-
-  return new Plugin({
-    key: new PluginKey(options.pluginKey),
-    view: (view) => {
-      const { destroy } = dragHandle.init(view);
-      return { destroy };
-    },
-    props: {
-      handleDOMEvents: {
-        mousemove: (view, event) => {
-          if (!view.editable || !dragHandle.element) return;
-
-          const node = nodeDOMAtCoords(
-            {
-              x:
-                event.clientX +
-                options.dragHandleOffset +
-                options.dragHandleWidth,
-              y: event.clientY,
-            },
-            options,
-          );
-
-          const notDragging = node?.closest(`.${DOM.CLASSES.NOT_DRAGGABLE}`);
-          const excludedTagList = options.excludedTags
-            .concat([DOM.TAGS.ORDERED_LIST, DOM.TAGS.UNORDERED_LIST])
-            .join(', ');
-
-          if (
-            !(node instanceof Element) ||
-            node.matches(excludedTagList) ||
-            notDragging
-          ) {
-            dragHandle.hideDragHandle();
-            return;
-          }
-
-          const compStyle = window.getComputedStyle(node);
-          const parsedLineHeight = parseInt(compStyle.lineHeight, 10);
-          const lineHeight = isNaN(parsedLineHeight)
-            ? parseInt(compStyle.fontSize) * 1.2
-            : parsedLineHeight;
-          const paddingTop = parseInt(compStyle.paddingTop, 10);
-
-          const rect = absoluteRect(node);
-
-          rect.top += (lineHeight - 24) / 2;
-          rect.top += paddingTop;
-          // Li markers
-          const listItemsSelector = 'ul:not([data-type=taskList]) li, ol li';
-          if (node.matches(listItemsSelector)) {
-            rect.left -= options.dragHandleWidth;
-          }
-          rect.width = options.dragHandleWidth;
-
-          dragHandle.element.style.left = `${rect.left - rect.width}px`;
-          dragHandle.element.style.top = `${rect.top}px`;
-          dragHandle.showDragHandle();
-        },
-        keydown: () => {
-          dragHandle.hideDragHandle();
-        },
-        mousewheel: () => {
-          dragHandle.hideDragHandle();
-        },
-        // dragging class is used for CSS
-        dragstart: (view) => {
-          view.dom.classList.add(DOM.CLASSES.DRAGGING);
-        },
-        drop: (view, event) => {
-          view.dom.classList.remove(DOM.CLASSES.DRAGGING);
-          dragHandle.hideDragHandle();
-          let droppedNode: Node | null = null;
-          const dropPos = view.posAtCoords({
-            left: event.clientX,
-            top: event.clientY,
-          });
-
-          if (!dropPos) return;
-
-          if (view.state.selection instanceof NodeSelection) {
-            droppedNode = view.state.selection.node;
-          }
-          if (!droppedNode) return;
-
-          const resolvedPos = view.state.doc.resolve(dropPos.pos);
-
-          const isDroppedInsideList =
-            resolvedPos.parent.type.name === NODE_TYPES.LIST_ITEM;
-
-          // If the selected node is a list item and is not dropped inside a list, we need to wrap it inside <ol> tag otherwise ol list items will be transformed into ul list item when dropped
-          if (
-            view.state.selection instanceof NodeSelection &&
-            view.state.selection.node.type.name === NODE_TYPES.LIST_ITEM &&
-            !isDroppedInsideList &&
-            dragHandle.listType === DOM.TAGS.ORDERED_LIST
-          ) {
-            const newList = view.state.schema.nodes[
-              NODE_TYPES.ORDERED_LIST
-            ]?.createAndFill(null, droppedNode);
-            const slice = new Slice(Fragment.from(newList), 0, 0);
-            view.dragging = { slice, move: event.ctrlKey };
-          }
-        },
-        dragend: (view) => {
-          view.dom.classList.remove(DOM.CLASSES.DRAGGING);
-        },
-      },
-    },
-  });
-}
 
 function calcNodePos(pos: number, view: EditorView) {
   const $pos = view.state.doc.resolve(pos);
