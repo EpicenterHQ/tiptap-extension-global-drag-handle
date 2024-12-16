@@ -10,22 +10,48 @@ import type { GlobalDragHandleOptions } from '.';
 import { absoluteRect, nodeDOMAtCoords, nodePosAtDOM } from './utils/dom';
 import { DOM, NODE_TYPES, DEFAULT_OPTIONS, MIME_TYPES } from './constants';
 
+const createDragHandle = (options: GlobalDragHandleOptions) => {
+  let element: HTMLElement | null = null;
+  return {
+    get element() {
+      return element;
+    },
+    init(view: EditorView) {
+      element = options.dragHandleSelector
+        ? document.querySelector<HTMLElement>(options.dragHandleSelector)
+        : null;
+
+      if (!element) {
+        element = document.createElement('div');
+        element.draggable = true;
+        element.dataset.dragHandle = '';
+        element.classList.add(DOM.CLASSES.DRAG_HANDLE);
+        view?.dom?.parentElement?.appendChild(element);
+      }
+    },
+    destroy() {
+      element?.remove?.();
+      element = null;
+    },
+    hideDragHandle() {
+      element?.classList.add(DOM.CLASSES.HIDE);
+    },
+    showDragHandle() {
+      element?.classList.remove(DOM.CLASSES.HIDE);
+    },
+  };
+};
+
 export function DragHandlePlugin(
   options: GlobalDragHandleOptions & { pluginKey: string },
 ) {
-  let dragHandleElement: HTMLElement | null = null;
+  const dragHandle = createDragHandle(options);
   let listType = '';
 
   return new Plugin({
     key: new PluginKey(options.pluginKey),
     view: (view) => {
-      const handleBySelector = options.dragHandleSelector
-        ? document.querySelector<HTMLElement>(options.dragHandleSelector)
-        : null;
-      dragHandleElement = handleBySelector ?? document.createElement('div');
-      dragHandleElement.draggable = true;
-      dragHandleElement.dataset.dragHandle = '';
-      dragHandleElement.classList.add(DOM.CLASSES.DRAG_HANDLE);
+      dragHandle.init(view);
 
       const onDragHandleDragStart = (e: DragEvent) =>
         handleDragStart({
@@ -37,10 +63,10 @@ export function DragHandlePlugin(
           },
         });
 
-      dragHandleElement.addEventListener('dragstart', onDragHandleDragStart);
+      dragHandle.element?.addEventListener('dragstart', onDragHandleDragStart);
 
       const onDragHandleDrag = (e: DragEvent) => {
-        hideDragHandle(dragHandleElement);
+        dragHandle.hideDragHandle();
         const scrollY = window.scrollY;
         if (e.clientY < options.scrollThreshold) {
           window.scrollTo({ top: scrollY - 30, behavior: 'smooth' });
@@ -49,16 +75,20 @@ export function DragHandlePlugin(
         }
       };
 
-      dragHandleElement.addEventListener('drag', onDragHandleDrag);
+      dragHandle.element?.addEventListener('drag', onDragHandleDrag);
 
-      hideDragHandle(dragHandleElement);
+      dragHandle.hideDragHandle();
 
-      if (!handleBySelector) {
-        view?.dom?.parentElement?.appendChild(dragHandleElement);
-      }
-
-      const boundHideHandleOnEditorOut = (e: MouseEvent) =>
-        hideHandleOnEditorOut(e, dragHandleElement);
+      const boundHideHandleOnEditorOut = (event: MouseEvent) => {
+        if (event.target instanceof Element) {
+          const relatedTarget = event.relatedTarget as HTMLElement;
+          const isInsideEditor =
+            relatedTarget?.classList.contains(DOM.CLASSES.TIPTAP) ||
+            relatedTarget?.classList.contains(DOM.CLASSES.DRAG_HANDLE);
+          if (isInsideEditor) return;
+        }
+        dragHandle.hideDragHandle();
+      };
 
       view?.dom?.parentElement?.addEventListener(
         'mouseout',
@@ -67,15 +97,12 @@ export function DragHandlePlugin(
 
       return {
         destroy: () => {
-          if (!handleBySelector) {
-            dragHandleElement?.remove?.();
-          }
-          dragHandleElement?.removeEventListener('drag', onDragHandleDrag);
-          dragHandleElement?.removeEventListener(
+          dragHandle.destroy();
+          dragHandle.element?.removeEventListener('drag', onDragHandleDrag);
+          dragHandle.element?.removeEventListener(
             'dragstart',
             onDragHandleDragStart,
           );
-          dragHandleElement = null;
           view?.dom?.parentElement?.removeEventListener(
             'mouseout',
             boundHideHandleOnEditorOut,
@@ -86,7 +113,7 @@ export function DragHandlePlugin(
     props: {
       handleDOMEvents: {
         mousemove: (view, event) => {
-          if (!view.editable || !dragHandleElement) return;
+          if (!view.editable || !dragHandle.element) return;
 
           const node = nodeDOMAtCoords(
             {
@@ -106,7 +133,7 @@ export function DragHandlePlugin(
             node.matches(excludedTagList) ||
             notDragging
           ) {
-            hideDragHandle(dragHandleElement);
+            dragHandle.hideDragHandle();
             return;
           }
 
@@ -122,21 +149,21 @@ export function DragHandlePlugin(
           rect.top += (lineHeight - 24) / 2;
           rect.top += paddingTop;
           // Li markers
-          const listItemsSelector = 'ul:not([data-type=taskList]) li, ol li'
+          const listItemsSelector = 'ul:not([data-type=taskList]) li, ol li';
           if (node.matches(listItemsSelector)) {
             rect.left -= options.dragHandleWidth;
           }
           rect.width = options.dragHandleWidth;
 
-          dragHandleElement.style.left = `${rect.left - rect.width}px`;
-          dragHandleElement.style.top = `${rect.top}px`;
-          showDragHandle(dragHandleElement);
+          dragHandle.element.style.left = `${rect.left - rect.width}px`;
+          dragHandle.element.style.top = `${rect.top}px`;
+          dragHandle.showDragHandle();
         },
         keydown: () => {
-          hideDragHandle(dragHandleElement);
+          dragHandle.hideDragHandle();
         },
         mousewheel: () => {
-          hideDragHandle(dragHandleElement);
+          dragHandle.hideDragHandle();
         },
         // dragging class is used for CSS
         dragstart: (view) => {
@@ -144,7 +171,7 @@ export function DragHandlePlugin(
         },
         drop: (view, event) => {
           view.dom.classList.remove(DOM.CLASSES.DRAGGING);
-          hideDragHandle(dragHandleElement);
+          dragHandle.hideDragHandle();
           let droppedNode: Node | null = null;
           const dropPos = view.posAtCoords({
             left: event.clientX,
@@ -170,10 +197,9 @@ export function DragHandlePlugin(
             !isDroppedInsideList &&
             listType === DOM.TAGS.ORDERED_LIST
           ) {
-            const newList = view.state.schema.nodes[NODE_TYPES.ORDERED_LIST]?.createAndFill(
-              null,
-              droppedNode,
-            );
+            const newList = view.state.schema.nodes[
+              NODE_TYPES.ORDERED_LIST
+            ]?.createAndFill(null, droppedNode);
             const slice = new Slice(Fragment.from(newList), 0, 0);
             view.dragging = { slice, move: event.ctrlKey };
           }
@@ -278,26 +304,6 @@ function handleDragStart({
   event.dataTransfer.setDragImage(node, 0, 0);
 
   view.dragging = { slice, move: event.ctrlKey };
-}
-
-function hideDragHandle(element: HTMLElement | null) {
-  element?.classList.add(DOM.CLASSES.HIDE);
-}
-
-function showDragHandle(element: HTMLElement | null) {
-  element?.classList.remove(DOM.CLASSES.HIDE);
-}
-
-function hideHandleOnEditorOut(event: MouseEvent, element: HTMLElement | null) {
-  if (event.target instanceof Element) {
-    const relatedTarget = event.relatedTarget as HTMLElement;
-    const isInsideEditor =
-      relatedTarget?.classList.contains(DOM.CLASSES.TIPTAP) ||
-      relatedTarget?.classList.contains(DOM.CLASSES.DRAG_HANDLE);
-
-    if (isInsideEditor) return;
-  }
-  hideDragHandle(element);
 }
 
 function calcNodePos(pos: number, view: EditorView) {
