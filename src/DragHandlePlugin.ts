@@ -12,9 +12,13 @@ import { DOM, NODE_TYPES, DEFAULT_OPTIONS, MIME_TYPES } from './constants';
 
 const createDragHandle = (options: GlobalDragHandleOptions) => {
   let element: HTMLElement | null = null;
+  let listType = '';
   return {
     get element() {
       return element;
+    },
+    get listType() {
+      return listType;
     },
     init(view: EditorView) {
       element = options.dragHandleSelector
@@ -29,10 +33,59 @@ const createDragHandle = (options: GlobalDragHandleOptions) => {
         view?.dom?.parentElement?.appendChild(element);
       }
       this.hideDragHandle();
-    },
-    destroy() {
-      element?.remove?.();
-      element = null;
+
+      const onDragHandleDragStart = (e: DragEvent) =>
+        handleDragStart({
+          event: e,
+          view,
+          options,
+          setListType: (type) => {
+            listType = type;
+          },
+        });
+
+      element?.addEventListener('dragstart', onDragHandleDragStart);
+
+      const onDragHandleDrag = (e: DragEvent) => {
+        this.hideDragHandle();
+        const scrollY = window.scrollY;
+        if (e.clientY < options.scrollThreshold) {
+          window.scrollTo({ top: scrollY - 30, behavior: 'smooth' });
+        } else if (window.innerHeight - e.clientY < options.scrollThreshold) {
+          window.scrollTo({ top: scrollY + 30, behavior: 'smooth' });
+        }
+      };
+
+      element?.addEventListener('drag', onDragHandleDrag);
+
+      const boundHideHandleOnEditorOut = (event: MouseEvent) => {
+        if (event.target instanceof Element) {
+          const relatedTarget = event.relatedTarget as HTMLElement;
+          const isInsideEditor =
+            relatedTarget?.classList.contains(DOM.CLASSES.TIPTAP) ||
+            relatedTarget?.classList.contains(DOM.CLASSES.DRAG_HANDLE);
+          if (isInsideEditor) return;
+        }
+        this.hideDragHandle();
+      };
+
+      view?.dom?.parentElement?.addEventListener(
+        'mouseout',
+        boundHideHandleOnEditorOut,
+      );
+
+      return {
+        destroy: () => {
+          element?.remove?.();
+          element?.removeEventListener('drag', onDragHandleDrag);
+          element?.removeEventListener('dragstart', onDragHandleDragStart);
+          view?.dom?.parentElement?.removeEventListener(
+            'mouseout',
+            boundHideHandleOnEditorOut,
+          );
+          element = null;
+        },
+      };
     },
     hideDragHandle() {
       element?.classList.add(DOM.CLASSES.HIDE);
@@ -47,67 +100,12 @@ export function DragHandlePlugin(
   options: GlobalDragHandleOptions & { pluginKey: string },
 ) {
   const dragHandle = createDragHandle(options);
-  let listType = '';
 
   return new Plugin({
     key: new PluginKey(options.pluginKey),
     view: (view) => {
-      dragHandle.init(view);
-
-      const onDragHandleDragStart = (e: DragEvent) =>
-        handleDragStart({
-          event: e,
-          view,
-          options,
-          setListType: (type) => {
-            listType = type;
-          },
-        });
-
-      dragHandle.element?.addEventListener('dragstart', onDragHandleDragStart);
-
-      const onDragHandleDrag = (e: DragEvent) => {
-        dragHandle.hideDragHandle();
-        const scrollY = window.scrollY;
-        if (e.clientY < options.scrollThreshold) {
-          window.scrollTo({ top: scrollY - 30, behavior: 'smooth' });
-        } else if (window.innerHeight - e.clientY < options.scrollThreshold) {
-          window.scrollTo({ top: scrollY + 30, behavior: 'smooth' });
-        }
-      };
-
-      dragHandle.element?.addEventListener('drag', onDragHandleDrag);
-
-      const boundHideHandleOnEditorOut = (event: MouseEvent) => {
-        if (event.target instanceof Element) {
-          const relatedTarget = event.relatedTarget as HTMLElement;
-          const isInsideEditor =
-            relatedTarget?.classList.contains(DOM.CLASSES.TIPTAP) ||
-            relatedTarget?.classList.contains(DOM.CLASSES.DRAG_HANDLE);
-          if (isInsideEditor) return;
-        }
-        dragHandle.hideDragHandle();
-      };
-
-      view?.dom?.parentElement?.addEventListener(
-        'mouseout',
-        boundHideHandleOnEditorOut,
-      );
-
-      return {
-        destroy: () => {
-          dragHandle.destroy();
-          dragHandle.element?.removeEventListener('drag', onDragHandleDrag);
-          dragHandle.element?.removeEventListener(
-            'dragstart',
-            onDragHandleDragStart,
-          );
-          view?.dom?.parentElement?.removeEventListener(
-            'mouseout',
-            boundHideHandleOnEditorOut,
-          );
-        },
-      };
+      const { destroy } = dragHandle.init(view);
+      return { destroy };
     },
     props: {
       handleDOMEvents: {
@@ -194,7 +192,7 @@ export function DragHandlePlugin(
             view.state.selection instanceof NodeSelection &&
             view.state.selection.node.type.name === NODE_TYPES.LIST_ITEM &&
             !isDroppedInsideList &&
-            listType === DOM.TAGS.ORDERED_LIST
+            dragHandle.listType === DOM.TAGS.ORDERED_LIST
           ) {
             const newList = view.state.schema.nodes[
               NODE_TYPES.ORDERED_LIST
