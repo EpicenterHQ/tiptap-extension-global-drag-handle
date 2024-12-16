@@ -1,4 +1,5 @@
 import type { EditorView } from '@tiptap/pm/view';
+import type { GlobalDragHandleOptions } from '..';
 
 
 export function absoluteRect(node: Element) {
