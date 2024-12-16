@@ -161,7 +161,10 @@ function createDragHandle(options: GlobalDragHandleOptions) {
 
         const node = nodeDOMAtCoords(
           {
-            x: event.clientX + 50 + options.dragHandleWidth,
+            x:
+              event.clientX +
+              options.dragHandleOffset +
+              options.dragHandleWidth,
             y: event.clientY,
           },
           options,
