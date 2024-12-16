@@ -28,6 +28,7 @@ const createDragHandle = (options: GlobalDragHandleOptions) => {
         element.classList.add(DOM.CLASSES.DRAG_HANDLE);
         view?.dom?.parentElement?.appendChild(element);
       }
+      this.hideDragHandle();
     },
     destroy() {
       element?.remove?.();
@@ -76,8 +77,6 @@ export function DragHandlePlugin(
       };
 
       dragHandle.element?.addEventListener('drag', onDragHandleDrag);
-
-      dragHandle.hideDragHandle();
 
       const boundHideHandleOnEditorOut = (event: MouseEvent) => {
         if (event.target instanceof Element) {
