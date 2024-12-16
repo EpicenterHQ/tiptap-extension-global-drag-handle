@@ -52,12 +52,7 @@ const GlobalDragHandle = Extension.create<GlobalDragHandleOptions>({
   },
 
   addProseMirrorPlugins() {
-    return [
-      DragHandlePlugin({
-        pluginKey: PLUGIN_NAME,
-        ...this.options,
-      }),
-    ];
+    return [DragHandlePlugin({ pluginKey: PLUGIN_NAME, ...this.options })];
   },
 });
 
