@@ -6,6 +6,7 @@ import {
   TextSelection,
 } from '@tiptap/pm/state';
 import { Fragment, Slice, type Node } from '@tiptap/pm/model';
+import { absoluteRect, nodeDOMAtCoords, nodePosAtDOM } from './utils/dom';
 
 import { __serializeForClipboard, type EditorView } from '@tiptap/pm/view';
 
@@ -35,63 +36,6 @@ export interface GlobalDragHandleOptions {
    * Custom nodes to be included for drag handle
    */
   customNodes: string[];
-}
-function absoluteRect(node: Element) {
-  const data = node.getBoundingClientRect();
-  const modal = node.closest('[role="dialog"]');
-
-  if (modal && window.getComputedStyle(modal).transform !== 'none') {
-    const modalRect = modal.getBoundingClientRect();
-
-    return {
-      top: data.top - modalRect.top,
-      left: data.left - modalRect.left,
-      width: data.width,
-    };
-  }
-  return {
-    top: data.top,
-    left: data.left,
-    width: data.width,
-  };
-}
-
-function nodeDOMAtCoords(
-  coords: { x: number; y: number },
-  options: GlobalDragHandleOptions,
-) {
-  const selectors = [
-    'li',
-    'p:not(:first-child)',
-    'pre',
-    'blockquote',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    ...options.customNodes.map((node) => `[data-type=${node}]`),
-  ].join(', ');
-  return document
-    .elementsFromPoint(coords.x, coords.y)
-    .find(
-      (elem: Element) =>
-        elem.parentElement?.matches?.('.ProseMirror') ||
-        elem.matches(selectors),
-    );
-}
-function nodePosAtDOM(
-  node: Element,
-  view: EditorView,
-  options: GlobalDragHandleOptions,
-) {
-  const boundingRect = node.getBoundingClientRect();
-
-  return view.posAtCoords({
-    left: boundingRect.left + 50 + options.dragHandleWidth,
-    top: boundingRect.top + 1,
-  })?.inside;
 }
 
 function calcNodePos(pos: number, view: EditorView) {
